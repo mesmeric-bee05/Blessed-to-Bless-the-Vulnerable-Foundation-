@@ -15,51 +15,17 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch and verify
+      - name: Fetch, verify and commit source
         shell: bash
         run: |
-          set -uo pipefail
-          EXPECTED=093ceb549f37867e5617d8639b40b5f27be8bddb8929423e9383cdae70acd0cf
-          urls=(
-            "https://h.uguu.se/dSnjjTxfmKrS.tar.gz"
-            "https://tmpfiles.org/dl/wtAXbGRn7tAY/bbvf-source.tar.gz"
-            "https://files.catbox.moe/ty1eha.gz"
-          )
-          : > /tmp/diag.txt
-          echo "runner=$(uname -a)" >> /tmp/diag.txt
-          ok=0
-          for u in "${urls[@]}"; do
-            rm -f /tmp/src.tar.gz
-            code=$(curl -L -A "Mozilla/5.0" --max-time 120 -o /tmp/src.tar.gz -w "%{http_code}" "$u" || echo "000")
-            size=$(stat -c%s /tmp/src.tar.gz 2>/dev/null || echo 0)
-            sum=$(sha256sum /tmp/src.tar.gz 2>/dev/null | cut -d' ' -f1 || echo none)
-            echo "$u code=$code size=$size sha=$sum" >> /tmp/diag.txt
-            if [ "$sum" = "$EXPECTED" ]; then ok=1; break; fi
-          done
-          echo "ok=$ok" >> /tmp/diag.txt
-          cat /tmp/diag.txt
-          if [ "$ok" != "1" ]; then
-            cp /tmp/diag.txt import-diagnostics.txt
-            git config user.name "mesmeric-bee05"
-            git config user.email "mesmeric-bee05@users.noreply.github.com"
-            git add import-diagnostics.txt
-            git commit -m "ci: import diagnostics [skip ci]"
-            git push
-            exit 1
-          fi
-          tar -xzf /tmp/src.tar.gz -C .
-          rm -f /tmp/src.tar.gz import-diagnostics.txt
-      - name: Commit project source
-        run: |
           set -euo pipefail
+          EXPECTED=0c84d74bd281a4e95a45e04f64b9caec2e6660129d0c3d8107e0702c5aac6d71
+          curl -fsSL -A "Mozilla/5.0" --max-time 180 "https://d.uguu.se/tTGGVMzJomkZ.tar.gz" -o /tmp/src.tar.gz
+          echo "$EXPECTED  /tmp/src.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/src.tar.gz -C .
+          rm -f /tmp/src.tar.gz
           git config user.name "mesmeric-bee05"
           git config user.email "mesmeric-bee05@users.noreply.github.com"
           git add -A
           git commit -m "feat: import BBVF website, database schema and security documentation"
-          git push
-      - name: Remove one-time importer
-        run: |
-          set -euo pipefail
-          git rm -q .github/workflows/import-source.yml
-          git commit -m "chore: remove one-time importer [skip ci]"
           git push
