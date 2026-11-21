@@ -1,13 +1,11 @@
 # BBVF — Blessed to Bless the Vulnerable Foundation
 
-The official website and secure intake platform for **Blessed to Bless the
-Vulnerable Foundation (BBVF)**, a Nairobi-based community foundation supporting
-vulnerable children, older persons, persons with disabilities and amputee
-veterans.
+The official website, secure intake platform, staff CMS and dual-rail donation
+flow for **Blessed to Bless the Vulnerable Foundation (BBVF)**, a Nairobi-based
+community foundation supporting vulnerable children, older persons, persons with
+disabilities and amputee veterans.
 
-Built to the specification in *Master Prompt BBVF Website Design & Implementation
-Specification* (21 November 2026), with one non-negotiable rule applied
-throughout:
+One rule runs through every page and every table:
 
 > **Nothing is published unless BBVF has supplied or approved it.** No invented
 > statistics, testimonials, leadership, registration numbers, certifications,
@@ -15,44 +13,37 @@ throughout:
 
 ---
 
-## Current status
-
-This repository is a **pre-launch production build**. It is complete as a
-website and secure intake layer. It deliberately does **not** pretend to be a
-finished donation platform.
+## What is built
 
 | Area | State |
 | --- | --- |
-| Public site (all sitemap routes, 46 static pages) | Built and type-checked |
+| Public site (all sitemap routes, static where possible) | Built, type-checked, production build passing |
 | Design system, responsive layout, 3D motion with reduced-motion support | Built |
-| Accessibility (semantic landmarks, focus states, labels, skip link, WCAG 2.2 AA target) | Built; independent audit pending |
 | SEO: metadata, canonicals, sitemap, robots, JSON-LD (NGO, WebSite, FAQPage, Article, DonateAction, BreadcrumbList) | Built |
-| Secure form intake (contact, volunteer, partner, institutional, safeguarding, donation interest, newsletter) | Built — requires Supabase env to persist |
-| Database schema, RLS, audit trail, consent model | Migrations provided |
-| M-Pesa Daraja STK Push / card checkout | **Not live** — merchant onboarding not complete |
-| Payload CMS admin UI | **Not included** — schema and roles provided; see “Known gaps” |
-| Gated investor area with authentication | **Not included** — manual verification instead |
-| Contact phone / email / office address | **Withheld** — unverified |
+| Secure form intake (contact, volunteer, partner, institutional, safeguarding, donation interest, newsletter) | Built — requires Supabase env to persist, fails closed with 503 |
+| Database schema, RLS, audit trail, consent model, payment hardening | Applied to Supabase (0001, 0002) |
+| Seed data (4 programmes, 16 activities, 4 campaigns, 4 FAQs, 7 policy drafts) | Inserted as needs_review, never published |
+| Staff CMS at /admin (auth, content publishing, triage, finance view, audit) | Built |
+| M-Pesa Daraja STK Push | Implemented; opens only when merchant credentials are set |
+| Stripe hosted Checkout (cards) | Implemented; opens only when keys are set |
+| Contact phone / email / office address | Withheld — unverified |
 
-The honest pre-launch banner is controlled by `NEXT_PUBLIC_SITE_STATUS`. Set it
-to `live` only after the launch checklist in `docs/CONTENT-GOVERNANCE.md` is
-signed off.
+`NEXT_PUBLIC_SITE_STATUS` controls the pre-launch banner and robots policy.
+Switch it to `live` only after the launch checklist in
+`docs/CONTENT-GOVERNANCE.md` is signed off.
 
 ---
 
 ## Stack
 
-- **Next.js 16** (App Router, Turbopack builds, React Server Components)
-- **React 19** with **TypeScript** in strict mode (`noUncheckedIndexedAccess`)
-- **Tailwind CSS 4** with a token-based design system in `src/app/globals.css`
+- **Next.js 16** (App Router, Turbopack, React Server Components)
+- **React 19**, **TypeScript** strict
+- **Tailwind CSS 4** with tokens in `src/app/globals.css`
 - **Supabase / PostgreSQL** for intake, content, donations, consent and audit
-- **Zod 4** for server-side schema validation
-- **No client-side UI, animation, icon or payment dependencies.** Everything is
-  hand-built, which keeps the JavaScript payload small on the mid-range Android
-  devices and 3G/4G connections most Kenyan donors use.
-
-Fonts are self-hosted at build time through `next/font` (Fraunces + Inter), so
-there is no third-party font request at runtime and no layout shift.
+- **Zod 4** for server-side validation
+- No client-side UI, animation, icon or payment SDKs. Stripe and Daraja are
+  called from route handlers with fetch, so no vendor JavaScript reaches the
+  browser.
 
 ---
 
@@ -61,169 +52,140 @@ there is no third-party font request at runtime and no layout shift.
 ```bash
 npm install
 cp .env.example .env.local
-npm run dev          # http://localhost:3000
+npm run dev            # http://localhost:3000
 npm run typecheck
 npm run build && npm start
+BASE_URL=http://127.0.0.1:3000 npm run smoke
 ```
 
-Node 20.9+ is required (developed on Node 26).
+Node 20.9+ is required. The public site renders fully without Supabase; forms
+return an honest 503 rather than pretending to save a message.
 
 ### Environment variables
 
-See `.env.example`. The site renders fully without Supabase; public forms will
-return an honest `503` explaining that the secure intake store is not connected
-rather than pretending to save a message.
-
 | Variable | Purpose | Client-exposed? |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SITE_URL` | Canonical origin for metadata, sitemap, JSON-LD | Yes (public by design) |
-| `NEXT_PUBLIC_SITE_STATUS` | `prelaunch` or `live`; controls banner and robots | Yes |
-| `SUPABASE_URL` | Supabase project URL | No |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only REST key for intake writes | **No — never prefix with `NEXT_PUBLIC_`** |
-| `FORM_HASH_PEPPER` | Pepper for hashed IP abuse signals | No |
-| `RESEND_API_KEY` | Transactional email (receipts/notifications) | No |
-| `BBVF_NOTIFICATION_EMAIL` | Internal notification recipient | No |
+| NEXT_PUBLIC_SITE_URL | Canonical origin for metadata and sitemap | Yes (public by design) |
+| NEXT_PUBLIC_SITE_STATUS | prelaunch or live | Yes |
+| SUPABASE_URL | Supabase project URL | No |
+| SUPABASE_SERVICE_ROLE_KEY | Server-only key for intake, CMS reads and webhooks | **No** |
+| SUPABASE_ANON_KEY | Publishable key used to verify staff sign-in | Publishable, but keep server-side here |
+| FORM_HASH_PEPPER | Pepper for hashed IP abuse signals | No |
+| STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET | Stripe Checkout and webhook verification | No |
+| CARD_CURRENCY | Currency for card gifts (default USD) | No |
+| MPESA_ENV | sandbox or production | No |
+| MPESA_CONSUMER_KEY / MPESA_CONSUMER_SECRET | Daraja app credentials | No |
+| MPESA_SHORTCODE / MPESA_PASSKEY | Paybill/till and STK password | No |
+| MPESA_CALLBACK_URL | Public HTTPS callback URL | No |
 
 ---
 
-## Database setup
+## Database
 
-The Supabase project is `upshfqorxwefxdorphku.supabase.co`.
+Project: `upshfqorxwefxdorphku.supabase.co`. The schema and seed have been applied.
 
-1. Open **SQL Editor** in Supabase.
-2. Run `supabase/migrations/0001_initial_schema.sql`.
-3. Run `supabase/seed.sql`. Seed rows are inserted as `needs_review`, never
-   `published` — publishing requires a real staff approval.
-4. Create the first staff user in **Authentication → Users**.
-5. Insert their profile with a role:
+1. `supabase/migrations/0001_initial_schema.sql` — 29 tables, enums, consent
+   model, RLS deny-by-default, audit triggers, private media bucket.
+2. `supabase/migrations/0002_payment_hardening.sql` — ties a verified payment
+   event to the exact donation it credits, and caps refunds at the captured
+   amount.
+3. `supabase/seed.sql` — verified public figures, inserted as needs_review.
+
+### First staff account
+
+1. Supabase → Authentication → Users → create the user (enable MFA for
+   privileged roles).
+2. Insert the profile:
 
 ```sql
 insert into profiles (id, full_name, role, mfa_enrolled)
 values ('<auth-user-uuid>', 'Full Name', 'super_admin', true);
 ```
 
-6. Enable MFA for every privileged account in Supabase Auth settings.
-7. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the hosting environment.
-
-### Why the service role is used for intake
-
-Public forms have **no** anonymous INSERT policy. The browser never talks to
-Supabase directly. The Next.js route handler validates with Zod, checks same-origin,
-rate-limits, hashes the IP, and only then inserts with the service role. This
-keeps the database unreachable from a tampered client and makes every intake path
-auditable in one place.
+Users without an active profile cannot sign in, even with a correct password.
+See `docs/ADMIN.md` for the role matrix and publishing rules.
 
 ### Data model highlights
 
-- `content_status` gate on every content table; `published` rows must have an
-  `approved_by` and `approved_at`.
-- `media_assets` records consent scope, guardian consent, identity sensitivity,
-  face/name/location permissions, expiry and EXIF-stripping status. A minor
-  cannot be stored without guardian consent (database check).
-- `safeguarding_reports` are segregated with reviewer-only RLS.
-- `donations` + `payment_events` implement an inbox pattern. A trigger **blocks**
-  a donation moving to `succeeded` unless a verified payment event has been
-  processed.
-- `audit_log` is written by triggers on campaigns, donation methods, media,
-  leadership and policies.
-- Storage bucket `media` is private; public delivery must go through a signed URL
-  issued after a consent check.
+- content_status gate on every content table; published rows need approved_by +
+  approved_at (and legal review for policies).
+- media_assets records consent scope, guardian consent, sensitivity,
+  face/name/location permissions, expiry and EXIF-stripping. A minor cannot be
+  stored without guardian consent.
+- safeguarding_reports are reviewer-only under RLS.
+- donations + payment_events use an inbox pattern; a trigger blocks succeeded
+  unless a verified event for that exact reference exists.
+- audit_log is append-only for staff.
 
 ---
 
-## Project structure
+## Payments
 
-```
-src/
-  app/                 routes (App Router), sitemap, robots, manifest, API
-  components/
-    brand/             wordmark, seal, programme artwork
-    cards/             programme and campaign cards
-    forms/             accessible intake forms (client)
-    motion/            reveal, tilt, 3D orbital hero (reduced-motion aware)
-    site/              header, footer
-    ui/                headings, breadcrumbs, progress ledger, JSON-LD, icons
-  content/             verified editorial content as typed data
-  lib/                 SEO, formatting, Supabase REST, validation, rate limit
-supabase/
-  migrations/          full schema, RLS, triggers, storage
-  seed.sql             verified public figures, marked needs_review
-docs/
-  SECURITY.md          threat model, ASVS mapping, incident response
-  CONTENT-GOVERNANCE.md approval workflow, launch gates, publication rules
-  PAYMENTS.md          rail-by-rail activation contract and state machine
-```
+Two rails, both server-verified. A donation is credited only after the provider
+confirms it; the browser is never trusted.
 
-Editorial content currently lives in `src/content/*` as typed data so that every
-fact is reviewable in version control. The Supabase schema is ready for the CMS
-phase; until that phase, changes to public copy go through a pull request and a
-named approver.
+- **Card (Stripe hosted Checkout).** BBVF never sees card data. Webhook
+  signatures are verified with HMAC-SHA256 and a 5-minute tolerance; the paid
+  amount is compared with the stored donation before crediting.
+- **M-Pesa (Daraja STK Push).** The PIN is entered on the phone. Daraja callbacks
+  are not signed, so the handler re-queries Safaricom for the result and checks
+  the amount before crediting.
+
+Both rails report pending/failed honestly and refunds are recorded in refunds.
+Receipts are written only after a verified success. Activation steps and the
+state machine are in `docs/PAYMENTS.md`; the pages at /donate/checkout show a
+"not connected" state until the relevant keys exist.
 
 ---
 
-## SEO and discovery
+## Admin CMS
 
-- Server-rendered/static HTML for every public page: no client-side rendering
-  dependency for crawlers.
-- Unique title, description and canonical on every route; Open Graph and Twitter
-  metadata.
-- `sitemap.xml` segmented by pages, programmes, campaigns, stories and published
-  policies; drafts, gated and API routes excluded.
-- `robots.txt` disallows everything while `NEXT_PUBLIC_SITE_STATUS=prelaunch`.
-- JSON-LD: `NGO`, `WebSite`, `BreadcrumbList`, `FAQPage`, `Article`,
-  `DonateAction`. Structured data never claims more than the visible page
-  (no registration number, no social profiles, no address until verified).
-- Core Web Vitals targets: LCP < 2.5s, INP < 200ms, CLS < 0.1. The build avoids
-  layout-shifting embeds, uses `next/font`, and ships no 3D/animation library.
+/admin is a staff tool: noindex, middleware-gated, verified against Supabase Auth
+on every request, then checked against profiles.role. It supports publishing with
+recorded approval, content editing, submission triage, safeguarding queues, a
+read-only finance view and the audit log. Full guide: `docs/ADMIN.md`.
 
 ---
 
-## Deployment
+## Security
 
-Any Node host that supports Next.js 16 works. Vercel is the lowest-friction
-option; Cloudflare in front adds WAF and DDoS protection.
+- CSP, HSTS (production), X-Frame-Options: DENY, nosniff, Referrer-Policy,
+  Permissions-Policy and COOP in `next.config.ts`.
+- Public intake has no anonymous INSERT policy. Route handlers validate with Zod,
+  check same-origin, rate-limit, hash the IP and insert with the service role
+  only.
+- Webhooks verify signatures (Stripe) or re-query the provider (Daraja), record
+  the raw event before acting, and are idempotent.
+- Threat model and ASVS mapping: `docs/SECURITY.md`.
 
-1. Set the environment variables above (production values).
-2. `npm run build` must pass in CI before deploy.
-3. Point the domain, enable HSTS (already sent in production by `next.config.ts`),
-   and submit `sitemap.xml` to Google Search Console and Bing Webmaster Tools.
-4. Keep the existing Jamii profile live until the new site has been stable for
-   30 days.
+---
 
-Security headers (CSP, HSTS, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy,
-Permissions-Policy, COOP) are applied to every response in `next.config.ts`.
+## Tests and CI
+
+`npm run smoke` checks every public route, the admin redirect, form validation
+and origin rejection, donation input validation and unsigned-webhook rejection.
+CI runs npm ci, typecheck, production build and npm audit --audit-level=high.
 
 ---
 
 ## Known gaps — stated, not hidden
 
-These are the remaining work items before this can be called a launched donation
-platform. Each is deliberate.
-
 1. **Legal identity and registration** must be confirmed by counsel and entered
-   into `content/site.ts` and the governance page.
-2. **ODPC registration** must be completed; the certificate number is not yet
-   available.
-3. **Leadership and board profiles** require written consent, biographies and
-   photographs.
-4. **Contact channels** (phone, email, office address) require BBVF verification.
-   The phone number in the discovery record came from a third-party listing.
-5. **Payment rails**: Safaricom Daraja onboarding, provider selection, webhook
-   signature verification, sandbox tests, reconciliation exports and refunds.
-   See `docs/PAYMENTS.md`.
-6. **Transactional email** with SPF/DKIM/DMARC before receipts are sent.
-7. **CMS admin UI** (Payload or Supabase-based) for non-technical staff; the
-   schema and role model exist, the interface does not.
-8. **Gated investor area** with passkey/TOTP authentication and scoped document
-   access.
-9. **Independent WCAG 2.2 AA audit** and a manual screen-reader pass.
-10. **Automated test suite** (unit, integration, Playwright donation flow,
-    `axe-core` in CI). CI currently runs typecheck, build and dependency audit.
-11. **Backup/restore drill**, monitoring, uptime alerts and a penetration test.
+   into `src/content/site.ts` and the governance page.
+2. **ODPC registration** must be completed.
+3. **Leadership profiles** require written consent, biographies and photographs.
+4. **Contact channels** require BBVF verification.
+5. **Merchant onboarding**: Daraja and Stripe credentials, sandbox-to-production
+   tests, reconciliation exports. The code is ready and env-gated.
+6. **Transactional email** with SPF/DKIM/DMARC before receipts are emailed.
+7. **Gated investor area** with passkey/TOTP and scoped document access.
+8. **Independent WCAG 2.2 AA audit** and a screen-reader pass.
+9. **End-to-end donation tests** against provider sandboxes.
+10. **Backup/restore drill**, monitoring, uptime alerts and a penetration test.
 
 ---
 
 ## Licence
 
-MIT (see `LICENSE` at the repository root). Content, brand assets and beneficiary
-stories are **not** covered by the software licence and may not be reused.
+MIT (see `LICENSE`). Content, brand assets and beneficiary stories are not
+covered by the software licence and may not be reused.
