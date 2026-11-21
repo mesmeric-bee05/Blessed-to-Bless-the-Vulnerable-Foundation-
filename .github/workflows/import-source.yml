@@ -1,0 +1,41 @@
+name: import-source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/import-source.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch and verify source archive
+        env:
+          SRC_URL: https://files.catbox.moe/ty1eha.gz
+          EXPECTED: 093ceb549f37867e5617d8639b40b5f27be8bddb8929423e9383cdae70acd0cf
+        run: |
+          set -euo pipefail
+          curl -fsSL "$SRC_URL" -o /tmp/src.tar.gz
+          echo "$EXPECTED  /tmp/src.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/src.tar.gz -C .
+          rm -f /tmp/src.tar.gz
+      - name: Commit project source
+        run: |
+          set -euo pipefail
+          git config user.name "mesmeric-bee05"
+          git config user.email "mesmeric-bee05@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: import BBVF website, database schema and security documentation"
+          git push
+      - name: Remove one-time importer
+        run: |
+          set -euo pipefail
+          git rm -q .github/workflows/import-source.yml
+          git commit -m "chore: remove one-time importer [skip ci]"
+          git push
