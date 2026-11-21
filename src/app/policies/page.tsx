@@ -4,7 +4,7 @@ import { PageHero } from "@/components/ui/PageHero";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Reveal } from "@/components/motion/Reveal";
 import { PendingNote } from "@/components/ui/PendingNote";
-import { policies } from "@/content/policies";
+import { getPublicPolicies } from "@/lib/cms-content";
 import { pageMetadata, breadcrumbSchema } from "@/lib/seo";
 import { JsonLd } from "@/components/ui/JsonLd";
 import { formatDate } from "@/lib/format";
@@ -22,7 +22,11 @@ const crumbs = [
   { name: "Policies", path: "/policies" },
 ];
 
-export default function PoliciesPage() {
+export const revalidate = 300;
+
+export default async function PoliciesPage() {
+  const policies = await getPublicPolicies();
+
   return (
     <>
       <div className="wrap pt-6">
@@ -39,7 +43,7 @@ export default function PoliciesPage() {
             instruments.
           </p>
         }
-        meta={<span>Last reviewed 21 November 2026</span>}
+        meta={[<span key="count">{policies.length} documents</span>, <span key="review">Last reviewed 21 November 2026</span>]}
       />
 
       <section className="section">

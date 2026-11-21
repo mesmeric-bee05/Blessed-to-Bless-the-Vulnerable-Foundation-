@@ -2,16 +2,19 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
-import { policies, getPolicy } from "@/content/policies";
+import { policies as staticPolicies } from "@/content/policies";
+import { getPublicPolicies } from "@/lib/cms-content";
 import { pageMetadata, breadcrumbSchema } from "@/lib/seo";
 import { JsonLd } from "@/components/ui/JsonLd";
 import { formatDate } from "@/lib/format";
 import { ArrowUpRight } from "@/components/ui/icons";
 
-export const dynamicParams = false;
+/** Known slugs are prerendered; a newly published policy renders on demand. */
+export const revalidate = 300;
+export const dynamicParams = true;
 
 export function generateStaticParams() {
-  return policies.map((policy) => ({ slug: policy.slug }));
+  return staticPolicies.map((policy) => ({ slug: policy.slug }));
 }
 
 export async function generateMetadata({
@@ -20,7 +23,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const policy = getPolicy(slug);
+  const policy = (await getPublicPolicies()).find((item) => item.slug === slug);
   if (!policy) return { title: "Policy not found" };
   return pageMetadata({
     title: policy.title,
@@ -36,7 +39,8 @@ export default async function PolicyPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const policy = getPolicy(slug);
+  const policies = await getPublicPolicies();
+  const policy = policies.find((item) => item.slug === slug);
   if (!policy) notFound();
 
   const crumbs = [

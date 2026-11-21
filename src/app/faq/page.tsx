@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PageHero } from "@/components/ui/PageHero";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Reveal } from "@/components/motion/Reveal";
-import { faqs } from "@/content/faqs";
+import { getPublicFaqs } from "@/lib/cms-content";
 import { pageMetadata, breadcrumbSchema, faqSchema } from "@/lib/seo";
 import { JsonLd } from "@/components/ui/JsonLd";
 import { ArrowUpRight } from "@/components/ui/icons";
@@ -22,7 +22,11 @@ const crumbs = [
 
 const categories = ["Giving", "Programs", "Trust", "Volunteering", "Privacy"] as const;
 
-export default function FaqPage() {
+export const revalidate = 300;
+
+export default async function FaqPage() {
+  const faqs = await getPublicFaqs();
+
   return (
     <>
       <div className="wrap pt-6">

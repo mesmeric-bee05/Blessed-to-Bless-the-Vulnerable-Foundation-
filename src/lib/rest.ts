@@ -67,6 +67,33 @@ async function request({
   }
 }
 
+/**
+ * Read published rows with the publishable/anon key. RLS still applies, so this
+ * can only ever see what an anonymous visitor may see. Used for public content,
+ * which keeps the service-role key out of the rendering path entirely.
+ */
+export async function publicSelect<T>(
+  table: string,
+  query: string,
+): Promise<T[]> {
+  const url = baseUrl();
+  const key = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key || !tableIsValid(table)) return [];
+
+  try {
+    const response = await fetch(`${url}/rest/v1/${table}?${query}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!response.ok) return [];
+    const data: unknown = await response.json();
+    return Array.isArray(data) ? (data as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function dbSelect<T>(
   table: string,
   query: string,
