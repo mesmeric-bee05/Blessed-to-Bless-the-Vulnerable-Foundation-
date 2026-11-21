@@ -9,13 +9,26 @@ import {
   getStaffSession,
   signInStaff,
   signOutStaff,
+  type StaffRole,
 } from "@/lib/auth";
 import { dbInsert, dbUpdate, eq, isDbConfigured } from "@/lib/rest";
 import {
   contentTypes,
   isContentStatus,
   isContentTypeKey,
+  type ContentTypeKey,
 } from "@/lib/content-types";
+
+/** Mirrors the database RLS matrix. The service role bypasses RLS, so this
+ * check must exist here too: a content editor may not touch campaigns, and a
+ * campaign manager may not publish programmes or policies. */
+const TYPE_EDITORS: Record<ContentTypeKey, StaffRole[]> = {
+  programs: ["super_admin", "content_editor"],
+  campaigns: ["super_admin", "campaign_manager"],
+  stories: ["super_admin", "content_editor", "communications_editor"],
+  faqs: ["super_admin", "content_editor", "communications_editor"],
+  policies: ["super_admin", "content_editor"],
+};
 
 const SUBMISSION_TABLES = [
   "contact_submissions",
@@ -72,6 +85,7 @@ export async function saveContentAction(formData: FormData): Promise<void> {
   const type = String(formData.get("type") ?? "");
   const id = String(formData.get("id") ?? "");
   if (!isContentTypeKey(type) || !id) redirect("/admin/content");
+  if (!TYPE_EDITORS[type].includes(session.role)) redirect("/admin?denied=1");
 
   const definition = contentTypes[type];
   const status = String(formData.get("status") ?? "draft");
