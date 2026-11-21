@@ -12,17 +12,26 @@ permissions:
 jobs:
   import:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Fetch and verify source archive
-        env:
-          SRC_URL: https://files.catbox.moe/ty1eha.gz
-          EXPECTED: 093ceb549f37867e5617d8639b40b5f27be8bddb8929423e9383cdae70acd0cf
+        shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL "$SRC_URL" -o /tmp/src.tar.gz
-          echo "$EXPECTED  /tmp/src.tar.gz" | sha256sum -c -
+          EXPECTED=093ceb549f37867e5617d8639b40b5f27be8bddb8929423e9383cdae70acd0cf
+          urls=(
+            "https://tmpfiles.org/dl/wtAXbGRn7tAY/bbvf-source.tar.gz"
+            "https://files.catbox.moe/ty1eha.gz"
+          )
+          ok=0
+          for u in "${urls[@]}"; do
+            echo "trying $u"
+            if curl -fsSL -A "Mozilla/5.0" --retry 2 --retry-delay 2 --max-time 120 "$u" -o /tmp/src.tar.gz; then
+              if echo "$EXPECTED  /tmp/src.tar.gz" | sha256sum -c -; then ok=1; break; fi
+            fi
+          done
+          test "$ok" = 1
           tar -xzf /tmp/src.tar.gz -C .
           rm -f /tmp/src.tar.gz
       - name: Commit project source
