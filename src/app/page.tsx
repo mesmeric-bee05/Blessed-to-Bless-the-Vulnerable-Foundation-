@@ -7,9 +7,11 @@ import { CampaignCard } from "@/components/cards/CampaignCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ProgressLedger } from "@/components/ui/ProgressLedger";
 import { PendingNote } from "@/components/ui/PendingNote";
-import { programs } from "@/content/programs";
-import { campaigns } from "@/content/campaigns";
-import { stories } from "@/content/stories";
+import {
+  getPublicPrograms,
+  getPublicCampaigns,
+  getPublicStories,
+} from "@/lib/cms-content";
 import { impact } from "@/content/impact";
 import { site } from "@/content/site";
 import { formatDate } from "@/lib/format";
@@ -21,9 +23,7 @@ import {
   Spark,
 } from "@/components/ui/icons";
 
-const featuredCampaign = campaigns[0]!;
-const otherCampaigns = campaigns.slice(1);
-const featuredStory = stories[0]!;
+export const revalidate = 300;
 
 const getInvolved = [
   {
@@ -46,7 +46,16 @@ const getInvolved = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [programs, campaigns, stories] = await Promise.all([
+    getPublicPrograms(),
+    getPublicCampaigns(),
+    getPublicStories(),
+  ]);
+  const featuredCampaign = campaigns[0]!;
+  const otherCampaigns = campaigns.slice(1);
+  const featuredStory = stories[0]!;
+
   return (
     <>
       {/* ---------------------------------------------------------------- hero */}

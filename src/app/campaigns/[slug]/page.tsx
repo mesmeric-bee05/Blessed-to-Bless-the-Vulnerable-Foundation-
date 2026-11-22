@@ -6,18 +6,20 @@ import { ProgressLedger } from "@/components/ui/ProgressLedger";
 import { PendingNote } from "@/components/ui/PendingNote";
 import { ProgramGlyph } from "@/components/brand/ProgramGlyph";
 import { Reveal } from "@/components/motion/Reveal";
-import { campaigns, getCampaign } from "@/content/campaigns";
-import { getProgram } from "@/content/programs";
+import { campaigns as staticCampaigns } from "@/content/campaigns";
+import { getPublicCampaign, getPublicProgram } from "@/lib/cms-content";
 import { pageMetadata, breadcrumbSchema, donateActionSchema } from "@/lib/seo";
 import { JsonLd } from "@/components/ui/JsonLd";
 import { site } from "@/content/site";
 import { formatDate } from "@/lib/format";
 import { ArrowUpRight, ExternalLink, Lock, Shield } from "@/components/ui/icons";
 
-export const dynamicParams = false;
+export const dynamicParams = true;
+export const revalidate = 300;
 
+/** Pre-render the reviewed campaigns; new CMS slugs render on demand. */
 export function generateStaticParams() {
-  return campaigns.map((campaign) => ({ slug: campaign.slug }));
+  return staticCampaigns.map((campaign) => ({ slug: campaign.slug }));
 }
 
 export async function generateMetadata({
@@ -26,7 +28,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const campaign = getCampaign(slug);
+  const campaign = await getPublicCampaign(slug);
   if (!campaign) return { title: "Campaign not found" };
   return pageMetadata({
     title: campaign.shortTitle,
@@ -41,10 +43,12 @@ export default async function CampaignPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const campaign = getCampaign(slug);
+  const campaign = await getPublicCampaign(slug);
   if (!campaign) notFound();
 
-  const program = getProgram(campaign.programSlug);
+  const program = campaign.programSlug
+    ? await getPublicProgram(campaign.programSlug)
+    : undefined;
   const crumbs = [
     { name: "Home", path: "/" },
     { name: "Campaigns", path: "/campaigns" },

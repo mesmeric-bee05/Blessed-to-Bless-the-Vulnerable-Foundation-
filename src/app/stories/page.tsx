@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PageHero } from "@/components/ui/PageHero";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Reveal } from "@/components/motion/Reveal";
-import { stories } from "@/content/stories";
+import { getPublicStories } from "@/lib/cms-content";
 import { pageMetadata, breadcrumbSchema } from "@/lib/seo";
 import { JsonLd } from "@/components/ui/JsonLd";
 import { formatDate } from "@/lib/format";
@@ -27,7 +27,11 @@ const kindLabel: Record<string, string> = {
   announcement: "Announcement",
 };
 
-export default function StoriesPage() {
+export const revalidate = 300;
+
+export default async function StoriesPage() {
+  const stories = await getPublicStories();
+
   return (
     <>
       <div className="wrap pt-6">

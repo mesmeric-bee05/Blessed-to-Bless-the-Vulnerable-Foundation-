@@ -1,16 +1,26 @@
 import type { MetadataRoute } from "next";
-import { programs } from "@/content/programs";
-import { campaigns } from "@/content/campaigns";
-import { stories } from "@/content/stories";
-import { policies } from "@/content/policies";
+import {
+  getPublicPrograms,
+  getPublicCampaigns,
+  getPublicStories,
+  getPublicPolicies,
+} from "@/lib/cms-content";
 import { absoluteUrl } from "@/lib/site-url";
 
 /**
  * Segmented by content type. Draft, gated and noindex routes are excluded:
- * a sitemap should list pages that are meant to be indexed.
+ * a sitemap should list pages that are meant to be indexed. Content comes from
+ * the same CMS-backed readers the pages use, so a newly published slug is
+ * listed without a code change.
  */
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date("2026-11-21T00:00:00Z");
+  const [programs, campaigns, stories, policies] = await Promise.all([
+    getPublicPrograms(),
+    getPublicCampaigns(),
+    getPublicStories(),
+    getPublicPolicies(),
+  ]);
 
   const staticRoutes: {
     path: string;

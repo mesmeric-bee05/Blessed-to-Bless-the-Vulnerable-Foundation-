@@ -1,151 +1,110 @@
-# Payment rails — activation contract
+# Taking payments: Stripe (cards) and M-Pesa (Daraja)
 
-This document is the specification a developer must implement before enabling
-direct giving. The website intentionally ships **without** a live checkout. A
-checkout that cannot settle, refund or reconcile is worse than no checkout.
+The site can take money through two rails. Both are built, tested against their
+providers' contracts, and deliberately switched off until real credentials exist.
+Until the variables below are set, `/donate/checkout` says "not connected" and
+`/api/donations/intent` refuses the request. The site never shows a success page
+for a payment it cannot verify.
 
----
-
-## 1. Non-negotiables
-
-1. **Never trust the browser.** A redirect to `/thank-you` is not proof of payment.
-   Only a cryptographically verified provider event may mark a donation
-   `succeeded`.
-2. **No raw card data.** Use hosted checkout or tokenised fields. BBVF's own
-   servers must never see a PAN, CVV or full bank credential.
-3. **Idempotency.** Every provider event is stored in `payment_events` with a
-   unique `(provider, provider_event_id)`. Replays are no-ops.
-4. **Single transaction.** Commit the raw event and the processing job before
-   acknowledging the provider. Acknowledge only after commit.
-5. **Server-side amount validation.** The amount and currency confirmed by the
-   provider must match the intent created server-side. Never trust a posted amount.
-6. **Consent separation.** Donation-processing consent is distinct from marketing
-   consent; every downstream email re-checks the current preference.
+Nothing in this document requires a developer. Do the steps in order and keep
+every secret in the hosting panel (Sites → Secrets), never in a file, email or
+chat message.
 
 ---
 
-## 2. Donation state machine
+## Stripe (cards) — test mode first
 
-```
-initiated → pending → authorized → succeeded
-     │          │           │
-     │          │           └→ failed / expired / cancelled
-     │          └→ under_review → succeeded / failed / refunded
-     └→ failed / cancelled / expired
+Test mode takes no real money and needs no company registration to start.
 
-succeeded → refunded | partially_refunded | chargeback
-```
+1. Create an account at `dashboard.stripe.com/register`. You can stay in test
+   mode while the business details are being confirmed.
+2. Make sure the dashboard toggle in the top right says **Test mode**.
+3. Open **Developers → API keys**. Copy the **Secret key** — it starts with
+   `sk_test_`. (The publishable key `pk_test_` is not needed by this site.)
+4. Add it to the hosting environment as `STRIPE_SECRET_KEY`.
+5. Create the webhook. **Developers → Webhooks → Add endpoint**:
+   - Endpoint URL: `https://<your-domain>/api/webhooks/stripe`
+   - Events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+     `charge.refunded`, `charge.refund.updated`
+6. Copy the **Signing secret** (`whsec_…`) and add it as `STRIPE_WEBHOOK_SECRET`.
+7. Redeploy so the new values are loaded, then donate KES 100 on
+   `/donate/checkout` with the test card `4242 4242 4242 4242`, any future expiry,
+   any three-digit CVC and any postcode.
 
-Transitions are guarded in the database: `succeeded` requires a processed,
-signature-verified `payment_events` row. `refunded` requires a `refunds` row.
+What a correct result looks like: the browser lands on `/donate/thank-you`, a row
+appears in `donations` with state `succeeded`, and an entry appears in
+`payment_events`. If the webhook is wrong, the payment exists at Stripe but the
+site does **not** credit it — that is intentional.
 
----
-
-## 3. Local rail — M-Pesa
-
-### Option A: Safaricom Daraja STK Push (preferred)
-
-Prerequisites, all in BBVF's own name:
-
-- KRA PIN and business registration.
-- Paybill or Till number.
-- Daraja developer app (consumer key/secret, passkey, shortcode).
-- Confirmed tariff and settlement account.
-- A publicly reachable HTTPS callback URL.
-
-Flow:
-
-1. `POST /api/donations/intent` validates the amount, campaign and consent, creates
-   a `donations` row (`initiated`), and returns a reference.
-2. Server requests an STK Push with that reference in `AccountReference`.
-3. Donor enters their PIN on their own phone. The site receives nothing.
-4. Daraja calls `POST /api/webhooks/daraja`. The handler:
-   - verifies the request against the expected shortcode and a shared secret or
-     IP allow-list (Daraja callbacks are not signed — treat source verification and
-     the subsequent status query as mandatory);
-   - inserts the raw payload into `payment_events`;
-   - resolves the donation by `CheckoutRequestID`;
-   - **queries the transaction status** before marking `succeeded`;
-   - writes a receipt job and reconciliation entry.
-5. `POST /api/webhooks/daraja/timeout` records the failure without deleting the
-   intent.
-
-Do not credit a donation from the callback body alone. Confirm with the status
-query.
-
-### Option B: Aggregator fallback (Paystack Kenya / IntaSend)
-
-Use when direct Daraja onboarding is delayed, or as a resilience rail. Verify the
-provider's current Kenyan coverage, fees, settlement currency and refund support
-directly — fee tables change without notice.
+Going live later: repeat steps 3–6 with the toggle off (`sk_live_…`, a new
+`whsec_…`), and complete Stripe's business verification. Kenya accepts card
+payments through Stripe only where the entity and settlement bank are supported;
+confirm this with Stripe before advertising card giving.
 
 ---
 
-## 4. International rail — card and wallet
+## M-Pesa (Daraja) — sandbox, then production
 
-- Stripe Checkout or Paystack hosted checkout. Hosted or tokenised fields only.
-- Set the success URL to a page that **reads the session server-side** and shows
-  the confirmed state; never a static "thank you".
-- Verify the webhook signature with the provider's signing secret and a raw-body
-  comparison.
-- Enable 3-D Secure where the provider supports it.
-- Recurring giving: store only the provider's customer/subscription token, never
-  card details. Publish the cancellation route before accepting recurring gifts.
-- Refunds and chargebacks: follow the provider's dispute API and record every
-  action in `refunds`.
+Daraja is Safaricom's developer portal. Sandbox uses fake money and a shared test
+shortcode, so it is safe to practise on.
 
-### PCI DSS scope
+### Sandbox
 
-With fully hosted checkout, the target is **SAQ A**. Requirements 6.4.3 and 11.6.1
-(script inventory and tamper detection) were removed from SAQ A for fully
-outsourced payment pages, but keep a documented script inventory, SRI on any
-third-party script, and a tamper-detection check on `/donate` as
-defence-in-depth.
+1. Register at `developer.safaricom.co.ke` with an email you can access.
+2. **My Apps → Add a new app**, choose *Lipa na M-Pesa Sandbox*. You receive a
+   **Consumer Key** and **Consumer Secret**.
+3. On the app page, note the **Passkey** shown for the sandbox shortcode
+   `174379` (this is Safaricom's published test passkey).
+4. Your callback must be a public HTTPS address — the site's own domain works:
+   `https://<your-domain>/api/webhooks/mpesa`
+5. Set these variables in hosting:
+   - `MPESA_CONSUMER_KEY`
+   - `MPESA_CONSUMER_SECRET`
+   - `MPESA_SHORTCODE=174379`
+   - `MPESA_PASSKEY`
+   - `MPESA_CALLBACK_URL=https://<your-domain>/api/webhooks/mpesa`
+   - `MPESA_ENV=sandbox`
+6. Redeploy, donate on `/donate/local`, and approve the STK Push prompt on the
+   Safaricom test handset number `254708374149` (Safaricom's published sandbox
+   MSISDN). The sandbox PIN is `1234`.
+
+The site does not trust the callback alone: on every callback it calls Daraja's
+query API for that CheckoutRequestID and only credits the donation when the
+provider itself says the payment completed. Duplicate callbacks are ignored.
+
+### Production
+
+1. Apply for a **Paybill or Till number** in the business name, and complete
+   Safaricom's KYC. This is the step that takes time — start it before you need
+   it.
+2. Create a **production app** on the portal and request *Lipa na M-Pesa Online*
+   access. You receive production consumer key/secret and the passkey for your
+   shortcode.
+3. Set the production values, with `MPESA_ENV=production` and
+   `MPESA_SHORTCODE=<your paybill or till>`.
+4. Do one real KES 10 donation end to end, then refund it from the M-Pesa portal
+   and confirm the site records the refund.
+
+### Things that go wrong
+
+- **Callback never arrives.** Safaricom cannot reach `localhost`. The URL must be
+  public HTTPS, with no port number and no query string.
+- **"Bad Request — Invalid CallbackURL".** The URL is unreachable or too long.
+- **STK prompt never appears.** The phone number must be in `2547XXXXXXXX` form
+  and must be an active Safaricom line.
+- **Payment succeeds but the site shows nothing.** Check the webhook secret/key
+  variables and the `/admin/donations` view; the reconciliation is provider-
+  verified, so a missing credit is safer than a false one.
 
 ---
 
-## 5. Required endpoints (to be implemented)
+## Rules the code enforces
 
-| Endpoint | Purpose | Controls |
-| --- | --- | --- |
-| `POST /api/donations/intent` | Create a server-side intent | Auth-less but rate-limited, Zod validation, CSRF/origin check, amount bounds, campaign must be published |
-| `POST /api/webhooks/daraja` | M-Pesa callback | Source verification, status re-query, idempotent, raw body stored |
-| `POST /api/webhooks/stripe` | Card events | Signature verification over raw body, idempotent |
-| `POST /api/webhooks/paystack` | Aggregator events | HMAC verification, idempotent |
-| `GET /api/donations/:reference` | Donor status lookup | Reference + email match, no enumeration, rate-limited |
-| `POST /api/admin/refunds` | Finance-initiated refund | MFA session, role check, audit log |
-
-All webhook handlers must:
-
-- read the **raw** request body before JSON parsing (signature covers bytes);
-- return `2xx` only after the event is committed;
-- return `409`/`5xx` on processing failure so the provider retries;
-- never log the full payload if it contains personal data.
-
----
-
-## 6. Receipts and reconciliation
-
-- Receipt email from a domain-based address, with SPF, DKIM and DMARC aligned.
-- Include: legal name, amount, currency, date, campaign designation, provider
-  reference, refund/cancellation route, privacy link, and the BBVF fraud warning.
-- Do not claim tax-deductibility.
-- Nightly job: export settled provider transactions, match to `donations`, flag
-  unmatched or amount-mismatched rows for finance review.
-- Monthly: reconcile campaign totals against the bank/provider statement and
-  publish the reconciled figure with its reporting period.
-
----
-
-## 7. Activating a rail — checklist
-
-- [ ] Provider contract and merchant account verified in BBVF's legal name.
-- [ ] Keys stored in the hosting secret manager (never in Git or the client bundle).
-- [ ] Sandbox end-to-end test: success, failure, cancel, timeout.
-- [ ] Duplicate webhook replay test: exactly one donation row.
-- [ ] Amount tampering test: server rejects a mismatched amount.
-- [ ] Refund test: donation moves to `refunded`, donor notified.
-- [ ] Receipt email verified in Gmail, Outlook and a Kenyan mobile client.
-- [ ] Reconciliation export reviewed by finance.
-- [ ] `donation_methods` row marked `is_live` with `verified_by` and `verified_at`.
-- [ ] Site copy updated: provider named, fees shown, terms linked.
+- Card data never touches BBVF servers; Stripe's hosted page collects it.
+- M-Pesa is re-queried server to server before a donation is marked paid.
+- Webhook signatures are checked with a timestamp tolerance, and the amount and
+  currency are compared with the intent that was created.
+- Every event is stored once by provider reference, so replays cannot double
+  credit a campaign.
+- Refunds are recorded and cannot exceed the original amount.
+- With no credentials the rail returns 503 rather than pretending to work.

@@ -3,18 +3,23 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { PendingNote } from "@/components/ui/PendingNote";
-import { stories, getStory } from "@/content/stories";
-import { getProgram } from "@/content/programs";
-import { getCampaign } from "@/content/campaigns";
+import { stories as staticStories } from "@/content/stories";
+import {
+  getPublicStory,
+  getPublicProgram,
+  getPublicCampaign,
+} from "@/lib/cms-content";
 import { pageMetadata, breadcrumbSchema, articleSchema } from "@/lib/seo";
 import { JsonLd } from "@/components/ui/JsonLd";
 import { formatDate } from "@/lib/format";
 import { ArrowUpRight } from "@/components/ui/icons";
 
-export const dynamicParams = false;
+export const dynamicParams = true;
+export const revalidate = 300;
 
+/** Pre-render the reviewed stories; new CMS slugs render on demand. */
 export function generateStaticParams() {
-  return stories.map((story) => ({ slug: story.slug }));
+  return staticStories.map((story) => ({ slug: story.slug }));
 }
 
 export async function generateMetadata({
@@ -23,7 +28,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const story = getStory(slug);
+  const story = await getPublicStory(slug);
   if (!story) return { title: "Story not found" };
   return pageMetadata({
     title: story.title,
@@ -40,14 +45,14 @@ export default async function StoryPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const story = getStory(slug);
+  const story = await getPublicStory(slug);
   if (!story) notFound();
 
   const program = story.relatedProgramSlug
-    ? getProgram(story.relatedProgramSlug)
+    ? await getPublicProgram(story.relatedProgramSlug)
     : undefined;
   const campaign = story.relatedCampaignSlug
-    ? getCampaign(story.relatedCampaignSlug)
+    ? await getPublicCampaign(story.relatedCampaignSlug)
     : undefined;
 
   const crumbs = [

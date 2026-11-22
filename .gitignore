@@ -30,3 +30,7 @@ npm-debug.log*
 
 # test output
 coverage/
+/freebuff-sites-build/
+/.open-next/
+/.wrangler/
+.secrets/

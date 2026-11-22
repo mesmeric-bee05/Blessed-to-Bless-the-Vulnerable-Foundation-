@@ -5,17 +5,19 @@ import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { ProgramGlyph } from "@/components/brand/ProgramGlyph";
 import { PendingNote } from "@/components/ui/PendingNote";
 import { Reveal } from "@/components/motion/Reveal";
-import { programs, getProgram } from "@/content/programs";
-import { getCampaign } from "@/content/campaigns";
+import { programs as staticPrograms } from "@/content/programs";
+import { getPublicProgram, getPublicCampaign } from "@/lib/cms-content";
 import { pageMetadata, breadcrumbSchema } from "@/lib/seo";
 import { JsonLd } from "@/components/ui/JsonLd";
 import { formatDate } from "@/lib/format";
 import { ArrowUpRight, Check } from "@/components/ui/icons";
 
-export const dynamicParams = false;
+export const dynamicParams = true;
+export const revalidate = 300;
 
+/** Pre-render the reviewed programmes; new CMS slugs render on demand. */
 export function generateStaticParams() {
-  return programs.map((program) => ({ slug: program.slug }));
+  return staticPrograms.map((program) => ({ slug: program.slug }));
 }
 
 export async function generateMetadata({
@@ -24,7 +26,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const program = getProgram(slug);
+  const program = await getPublicProgram(slug);
   if (!program) return { title: "Programme not found" };
   return pageMetadata({
     title: program.title,
@@ -51,10 +53,12 @@ export default async function ProgramPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const program = getProgram(slug);
+  const program = await getPublicProgram(slug);
   if (!program) notFound();
 
-  const related = getCampaign(program.relatedCampaignSlug);
+  const related = program.relatedCampaignSlug
+    ? await getPublicCampaign(program.relatedCampaignSlug)
+    : undefined;
   const crumbs = [
     { name: "Home", path: "/" },
     { name: "Programs", path: "/programs" },

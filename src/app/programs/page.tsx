@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { ProgramCard } from "@/components/cards/ProgramCard";
 import { Reveal } from "@/components/motion/Reveal";
 import { PendingNote } from "@/components/ui/PendingNote";
-import { programs } from "@/content/programs";
+import { getPublicPrograms } from "@/lib/cms-content";
 import { pageMetadata, breadcrumbSchema } from "@/lib/seo";
 import { JsonLd } from "@/components/ui/JsonLd";
 import { ArrowRight } from "@/components/ui/icons";
@@ -22,7 +22,11 @@ const crumbs = [
   { name: "Programs", path: "/programs" },
 ];
 
-export default function ProgramsPage() {
+export const revalidate = 300;
+
+export default async function ProgramsPage() {
+  const programs = await getPublicPrograms();
+
   return (
     <>
       <div className="wrap pt-6">

@@ -14,8 +14,8 @@ export type ContentType = {
   label: string;
   /** Primary text column. */
   titleField: "title" | "question";
-  /** Short summary column, or the answer for FAQs. */
-  summaryField: "summary" | "answer";
+  /** Short summary column, or the answer for FAQs, or a story's excerpt. */
+  summaryField: "summary" | "answer" | "excerpt";
   /** Optional long-form column. */
   bodyField: "body_md" | "story_md" | null;
   bodyLabel?: string;
@@ -51,7 +51,7 @@ export const contentTypes: Record<ContentTypeKey, ContentType> = {
     table: "stories",
     label: "Stories",
     titleField: "title",
-    summaryField: "summary",
+    summaryField: "excerpt",
     bodyField: "body_md",
     requiresApproval: true,
   },

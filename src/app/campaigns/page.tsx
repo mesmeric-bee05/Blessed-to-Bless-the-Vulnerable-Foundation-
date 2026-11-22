@@ -4,7 +4,7 @@ import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { CampaignCard } from "@/components/cards/CampaignCard";
 import { Reveal } from "@/components/motion/Reveal";
 import { PendingNote } from "@/components/ui/PendingNote";
-import { campaigns, campaignTotals } from "@/content/campaigns";
+import { getPublicCampaigns } from "@/lib/cms-content";
 import { pageMetadata, breadcrumbSchema } from "@/lib/seo";
 import { JsonLd } from "@/components/ui/JsonLd";
 import { formatKES, formatDate } from "@/lib/format";
@@ -21,7 +21,20 @@ const crumbs = [
   { name: "Campaigns", path: "/campaigns" },
 ];
 
-export default function CampaignsPage() {
+export const revalidate = 300;
+
+export default async function CampaignsPage() {
+  const campaigns = await getPublicCampaigns();
+  const campaignTotals = {
+    target: campaigns.reduce((sum, campaign) => sum + (campaign.target ?? 0), 0),
+    received: campaigns.reduce((sum, campaign) => sum + (campaign.received ?? 0), 0),
+    supporters: campaigns.reduce((sum, campaign) => sum + (campaign.supporters ?? 0), 0),
+    reportedOn: campaigns
+      .map((campaign) => campaign.reportedOn)
+      .sort()
+      .at(-1) ?? "2026-11-21",
+  };
+
   return (
     <>
       <div className="wrap pt-6">

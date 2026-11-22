@@ -9,7 +9,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { dbSelect } from "@/lib/rest";
+import { dbSelect, eq } from "@/lib/rest";
 
 export const ACCESS_COOKIE = "bbvf_admin_access";
 export const REFRESH_COOKIE = "bbvf_admin_refresh";
@@ -98,7 +98,7 @@ export async function signInStaff(
 
   const profiles = await dbSelect<{ role: StaffRole; is_active: boolean; full_name: string }>(
     "profiles",
-    `select=role,is_active,full_name&id=${encodeURIComponent(data.user.id)}`,
+    `select=role,is_active,full_name&id=${eq(data.user.id)}`,
   );
   const profile = profiles[0];
   if (!profile || !profile.is_active) {
@@ -153,7 +153,7 @@ export async function getStaffSession(): Promise<StaffSession | null> {
       mfa_enrolled: boolean;
     }>(
       "profiles",
-      `select=role,is_active,full_name,mfa_enrolled&id=${encodeURIComponent(user.id)}`,
+      `select=role,is_active,full_name,mfa_enrolled&id=${eq(user.id)}`,
     );
     const profile = profiles[0];
     if (!profile || !profile.is_active) return null;
