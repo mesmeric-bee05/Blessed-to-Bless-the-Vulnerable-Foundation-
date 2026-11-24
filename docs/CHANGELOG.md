@@ -16,6 +16,9 @@ phones.
 **Tap targets.** Breadcrumbs, footer links, policy links and inline CTAs now
 render at least 32px tall, above the WCAG 2.2 24px minimum.
 
+**Form submit buttons use the brand green** on light surfaces, matching every
+other primary action on the site.
+
 **Verified at 320, 360, 390, 414 and 768px:** no horizontal scrolling on any
 page, no clipped content, and no layout shift from the photograph swap
 (intrinsic width and height are always set).
