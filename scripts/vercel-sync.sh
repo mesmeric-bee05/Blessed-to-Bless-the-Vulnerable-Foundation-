@@ -4,9 +4,9 @@
 #
 # The reviewed source is published as a patch by the canonical deployment, and
 # the JPEGs (including the 640/960px responsive variants) are copied from the
-# same origin, so the built site serves every image from its own domain. The
-# patch is applied whenever it still applies cleanly, and any failure aborts the
-# build instead of shipping an incomplete site.
+# same origin, so the built site serves every image from its own domain. If the
+# patch cannot be applied the build stops: shipping a half-updated site would be
+# worse than a failed deployment.
 #
 # Remove this script and the installCommand in vercel.json once the files are
 # committed to this repository.
@@ -15,11 +15,16 @@ set -euo pipefail
 ORIGIN="${BBVF_SYNC_ORIGIN:-https://bbvf-website-z2zbp7.freebuff.site}"
 
 curl -fsSL --retry 3 --max-time 120 -o /tmp/bbvf-sync.patch "$ORIGIN/bbvf-sync.patch"
-if git apply --check --whitespace=nowarn /tmp/bbvf-sync.patch; then
+if ! git apply --check --whitespace=nowarn /tmp/bbvf-sync.patch; then
+  echo "[vercel-sync] the reviewed source patch does not apply; regenerate it" >&2
+  exit 1
+fi
+
+if [ -f src/components/ui/Photo.tsx ] && grep -q "tap-target" src/app/globals.css; then
+  echo "[vercel-sync] site source already current"
+else
   echo "[vercel-sync] applying the reviewed site source"
   git apply --whitespace=nowarn /tmp/bbvf-sync.patch
-else
-  echo "[vercel-sync] site source already current"
 fi
 
 mkdir -p public/photos
