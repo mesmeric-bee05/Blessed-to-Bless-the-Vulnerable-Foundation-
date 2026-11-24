@@ -1,5 +1,25 @@
 # Changelog
 
+## 24 November 2026 — responsive pass
+
+**Phones download a third of the bytes.** Every photograph ships 640px and
+960px variants beside the full-size file (`npm run media:sizes`), offered through
+`srcset`/`sizes` by the new `Photo` component. A 390px phone now receives the
+640px file; a desktop still gets the full crop. The collapsed service panels no
+longer download their photographs at all.
+
+**iOS no longer zooms into forms.** Inputs, selects and textareas render at 16px
+on screens below 768px, which stops Safari's automatic zoom-on-focus. Combined
+with `viewport-fit=cover` and safe-area padding, forms stay still on notched
+phones.
+
+**Tap targets.** Breadcrumbs, footer links, policy links and inline CTAs now
+render at least 32px tall, above the WCAG 2.2 24px minimum.
+
+**Verified at 320, 360, 390, 414 and 768px:** no horizontal scrolling on any
+page, no clipped content, and no layout shift from the photograph swap
+(intrinsic width and height are always set).
+
 ## 24 November 2026
 
 **Photography replaces every illustration.** The four service cards, the
