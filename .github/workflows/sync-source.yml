@@ -45,4 +45,4 @@ jobs:
           git config user.email "dev@bbvf.org"
           git add -A
           git commit -m "feat: launch the redesigned BBVF website (brand, real photography, referral route)"
-          git push
+          git push origin HEAD:main
