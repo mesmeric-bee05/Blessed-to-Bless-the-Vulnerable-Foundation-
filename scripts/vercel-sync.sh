@@ -4,9 +4,9 @@
 #
 # The reviewed source is published as a patch by the canonical deployment, and
 # the JPEGs (including the 640/960px responsive variants) are copied from the
-# same origin, so the built site serves every image from its own domain. Both
-# steps are skipped once the files are present, and any failure aborts the build
-# instead of shipping an incomplete site.
+# same origin, so the built site serves every image from its own domain. The
+# patch is applied whenever it still applies cleanly, and any failure aborts the
+# build instead of shipping an incomplete site.
 #
 # Remove this script and the installCommand in vercel.json once the files are
 # committed to this repository.
@@ -14,13 +14,9 @@ set -euo pipefail
 
 ORIGIN="${BBVF_SYNC_ORIGIN:-https://bbvf-website-z2zbp7.freebuff.site}"
 
-needs_source() {
-  [ ! -f src/content/service-art.ts ] || ! grep -q "campaignPhotos" src/content/service-art.ts
-}
-
-if needs_source; then
+curl -fsSL --retry 3 --max-time 120 -o /tmp/bbvf-sync.patch "$ORIGIN/bbvf-sync.patch"
+if git apply --check --whitespace=nowarn /tmp/bbvf-sync.patch; then
   echo "[vercel-sync] applying the reviewed site source"
-  curl -fsSL --retry 3 --max-time 120 -o /tmp/bbvf-sync.patch "$ORIGIN/bbvf-sync.patch"
   git apply --whitespace=nowarn /tmp/bbvf-sync.patch
 else
   echo "[vercel-sync] site source already current"
