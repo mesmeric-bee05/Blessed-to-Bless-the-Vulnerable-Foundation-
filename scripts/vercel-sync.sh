@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bootstrap for a deployment created from a repository that does not yet carry
-# the updated site source or its artwork.
+# the updated site source or its photographs.
 #
 # The reviewed source is published as a patch by the canonical deployment, and
 # the JPEGs are copied from the same origin, so the built site serves every
@@ -14,7 +14,7 @@ set -euo pipefail
 ORIGIN="${BBVF_SYNC_ORIGIN:-https://bbvf-website-z2zbp7.freebuff.site}"
 
 needs_source() {
-  [ ! -f src/content/service-art.ts ] || ! grep -q "fieldPhotos" src/content/service-art.ts
+  [ ! -f src/content/service-art.ts ] || ! grep -q "campaignPhotos" src/content/service-art.ts
 }
 
 if needs_source; then
@@ -25,15 +25,12 @@ else
   echo "[vercel-sync] site source already current"
 fi
 
-mkdir -p public/art public/photos
-echo "[vercel-sync] ensuring artwork is present"
-for name in amputee-veterans children-education disability-inclusion distribution elderly-care field-supplies hero-field; do
-  if [ ! -s "public/art/$name.jpg" ]; then
-    curl -fsSL --retry 3 --max-time 120 -o "public/art/$name.jpg" "$ORIGIN/art/$name.jpg"
+mkdir -p public/photos
+echo "[vercel-sync] ensuring photography is present"
+for name in community-support hero-school hero-supplies service-children service-elderly service-disability service-veterans campaign-ageing campaign-veterans campaign-barriers campaign-school; do
+  if [ ! -s "public/photos/$name.jpg" ]; then
+    curl -fsSL --retry 3 --max-time 120 -o "public/photos/$name.jpg" "$ORIGIN/photos/$name.jpg"
   fi
 done
-if [ ! -s public/photos/community-support.jpg ]; then
-  curl -fsSL --retry 3 --max-time 120 -o public/photos/community-support.jpg "$ORIGIN/photos/community-support.jpg"
-fi
 
 echo "[vercel-sync] ready"
