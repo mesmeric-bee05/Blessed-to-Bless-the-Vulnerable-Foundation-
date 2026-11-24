@@ -23,6 +23,14 @@ other primary action on the site.
 page, no clipped content, and no layout shift from the photograph swap
 (intrinsic width and height are always set).
 
+### How this repository reaches Vercel
+
+This repository is still the original scaffold. A deployment therefore applies
+the reviewed source patch and copies the photographs during its install step
+(`scripts/vercel-sync.sh`), and the build stops with a clear error if the patch
+no longer applies. Committing the site source here, then deleting that script
+and the `installCommand` in `vercel.json`, removes the indirection.
+
 ## 24 November 2026
 
 **Photography replaces every illustration.** The four service cards, the
