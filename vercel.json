@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "bash scripts/vercel-sync.sh && npm ci",
+  "buildCommand": "npm run build"
+}
