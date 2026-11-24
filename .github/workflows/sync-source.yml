@@ -1,6 +1,48 @@
 name: Sync website source
 
 # One-time sync: applies the reviewed source patch and mirrors the artwork from
-# the canonical deployment, then commits the result so Vercel rebuilds. Safe to
-# re-run; the patch applies only to the pre-sync tree.
-on: work? 
+# the canonical deployment, then commits the result so the hosting provider
+# rebuilds. Path-filtered, so later work does not re-run it.
+on:
+  push:
+    paths:
+      - .github/workflows/sync-source.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply reviewed source patch
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --max-time 60 -o /tmp/bbvf-sync.patch \
+            "https://bbvf-website-z2zbp7.freebuff.site/bbvf-sync.patch"
+          git apply --whitespace=nowarn /tmp/bbvf-sync.patch
+
+      - name: Mirror artwork
+        run: |
+          set -euo pipefail
+          base="https://bbvf-website-z2zbp7.freebuff.site"
+          mkdir -p public/art public/photos
+          for name in amputee-veterans children-education disability-inclusion distribution elderly-care field-supplies hero-field; do
+            curl -fsSL --retry 3 --max-time 60 -o "public/art/$name.jpg" "$base/art/$name.jpg"
+          done
+          curl -fsSL --retry 3 --max-time 60 -o public/photos/community-support.jpg "$base/photos/community-support.jpg"
+
+      - name: Commit the synced site
+        run: |
+          set -euo pipefail
+          git config user.name "BBVF site sync"
+          git config user.email "dev@bbvf.org"
+          git add -A
+          git commit -m "feat: launch the redesigned BBVF website (brand, real photography, referral route)"
+          git push
