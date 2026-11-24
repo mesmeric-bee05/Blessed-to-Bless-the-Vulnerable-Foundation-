@@ -1,0 +1,6 @@
+name: Sync website source
+
+# One-time sync: applies the reviewed source patch and mirrors the artwork from
+# the canonical deployment, then commits the result so Vercel rebuilds. Safe to
+# re-run; the patch applies only to the pre-sync tree.
+on: work? 
