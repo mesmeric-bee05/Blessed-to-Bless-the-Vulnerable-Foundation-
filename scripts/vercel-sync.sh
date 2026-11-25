@@ -4,9 +4,14 @@
 #
 # The reviewed source is published as a patch by the canonical deployment, and
 # the JPEGs (including the 640/960px responsive variants) are copied from the
-# same origin, so the built site serves every image from its own domain. If the
-# patch cannot be applied the build stops: shipping a half-updated site would be
-# worse than a failed deployment.
+# same origin, so the built site serves every image from its own domain.
+#
+# The patch step is idempotent rather than gated on a hand-written marker:
+#   * it applies when the patch applies cleanly to this checkout,
+#   * it skips when the same patch is already present (reverse-apply check),
+#   * it fails the build when neither is true, because that means the repository
+#     and the published patch have diverged and shipping either one alone would
+#     publish a half-updated site.
 #
 # Remove this script and the installCommand in vercel.json once the files are
 # committed to this repository.
@@ -14,17 +19,18 @@ set -euo pipefail
 
 ORIGIN="${BBVF_SYNC_ORIGIN:-https://bbvf-website-z2zbp7.freebuff.site}"
 
-curl -fsSL --retry 3 --max-time 120 -o /tmp/bbvf-sync.patch "$ORIGIN/bbvf-sync.patch"
-if ! git apply --check --whitespace=nowarn /tmp/bbvf-sync.patch; then
-  echo "[vercel-sync] the reviewed source patch does not apply; regenerate it" >&2
-  exit 1
-fi
+echo "[vercel-sync] fetching the published source patch"
+curl -fsSL --retry 3 --max-time 180 -o /tmp/bbvf-sync.patch "$ORIGIN/bbvf-sync.patch"
 
-if [ -f src/components/ui/Photo.tsx ] && grep -q "tap-target" src/app/globals.css; then
-  echo "[vercel-sync] site source already current"
-else
+if git apply --check --whitespace=nowarn /tmp/bbvf-sync.patch 2>/dev/null; then
   echo "[vercel-sync] applying the reviewed site source"
   git apply --whitespace=nowarn /tmp/bbvf-sync.patch
+elif git apply --check --reverse --whitespace=nowarn /tmp/bbvf-sync.patch 2>/dev/null; then
+  echo "[vercel-sync] site source is already at the published revision"
+else
+  echo "[vercel-sync] ERROR: the published patch does not apply to this commit." >&2
+  echo "[vercel-sync] The repository has diverged from the reviewed source." >&2
+  exit 1
 fi
 
 mkdir -p public/photos
